@@ -1,0 +1,5 @@
+node_modules
+dist
+.stitch
+.DS_Store
+.vercel

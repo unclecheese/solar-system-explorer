@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solar System Explorer</title>
+  <meta name="description"
+    content="A first-person journey through a to-scale model of our solar system. Fly between planets at the speed of light using real orbital mechanics and NASA imagery.">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Solar System Explorer">
+  <meta property="og:description"
+    content="Fly through a to-scale solar system at the speed of light. Real planet positions, NASA textures, and first-person controls.">
+  <meta property="og:image" content="/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Solar System Explorer">
+  <meta name="twitter:description"
+    content="Fly through a to-scale solar system at the speed of light. Real planet positions, NASA textures, and first-person controls.">
+  <meta name="twitter:image" content="/og-image.png">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet">
+</head>
+
+<body class="bg-[#121315] text-[#e3e2e5] font-[Inter] overflow-hidden m-0 p-0">
+  <canvas id="scene"></canvas>
+
+  <!-- HUD Overlay -->
+  <div id="hud" class="fixed inset-0 z-10 pointer-events-none" style="display:none;">
+    <!-- Top Bar -->
+    <header class="absolute top-0 left-0 w-full flex justify-between items-start" style="padding:48px 64px 0 64px;">
+      <div class="flex flex-col">
+        <div class="text-base font-bold text-[#8ECAE6] font-[Space_Grotesk] tracking-[0.15em] uppercase">Interstellar
+          HUD</div>
+        <div class="text-[10px] font-[JetBrains_Mono] text-[#8ECAE6]/40 tracking-[0.2em] mt-0.5">S.S.E. ENGINE V1.0.0
+        </div>
+      </div>
+      <div class="flex items-center gap-8">
+        <div class="flex flex-col items-end">
+          <span class="text-[9px] font-[JetBrains_Mono] text-[#B0E5FF]/50 uppercase tracking-tight">Warp Factor</span>
+          <span id="speed-display" class="text-sm font-[JetBrains_Mono] text-[#B0E5FF] tracking-[0.15em]">1x c</span>
+        </div>
+        <div class="flex flex-col items-end">
+          <span class="text-[9px] font-[JetBrains_Mono] text-[#B0E5FF]/50 uppercase tracking-tight">Dist. from
+            Earth</span>
+          <span id="distance-display" class="text-sm font-[JetBrains_Mono] text-[#B0E5FF] tracking-[0.15em]">0.000
+            AU</span>
+        </div>
+        <div class="flex flex-col items-end">
+          <span class="text-[9px] font-[JetBrains_Mono] text-[#B0E5FF]/50 uppercase tracking-tight">Light-Time</span>
+          <span id="lighttime-display" class="text-sm font-[JetBrains_Mono] text-[#B0E5FF] tracking-[0.15em]">0.0
+            min</span>
+        </div>
+        <div class="flex flex-col items-end">
+          <span class="text-[9px] font-[JetBrains_Mono] text-[#B0E5FF]/50 uppercase tracking-tight">Ext. Temp</span>
+          <span id="temp-display" class="text-sm font-[JetBrains_Mono] text-[#B0E5FF] tracking-[0.15em]">2.7 K / -270
+            °C</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Crosshair + Target Prompt -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <line x1="16" y1="4" x2="16" y2="12" stroke="#8ECAE6" stroke-width="1" opacity="0.6" />
+        <line x1="16" y1="20" x2="16" y2="28" stroke="#8ECAE6" stroke-width="1" opacity="0.6" />
+        <line x1="4" y1="16" x2="12" y2="16" stroke="#8ECAE6" stroke-width="1" opacity="0.6" />
+        <line x1="20" y1="16" x2="28" y2="16" stroke="#8ECAE6" stroke-width="1" opacity="0.6" />
+        <rect x="14" y="14" width="4" height="4" stroke="#8ECAE6" stroke-width="0.5" fill="none" opacity="0.4" />
+      </svg>
+      <!-- Prompt to set target (shown when planet near crosshair but not yet targeted) -->
+      <div id="target-prompt" class="mt-3 opacity-0 transition-opacity duration-200 text-center">
+        <div id="target-prompt-name"
+          class="font-[Space_Grotesk] text-xs font-medium uppercase tracking-[0.1em] text-[#B0E5FF] mb-0.5">—</div>
+        <div class="font-[JetBrains_Mono] text-[9px] text-[#8ECAE6]/50 uppercase tracking-[0.1em]">Right-click to set
+          target</div>
+      </div>
+    </div>
+
+    <!-- Navigation Arrows Container -->
+    <div id="nav-arrows" class="absolute inset-0 overflow-hidden"></div>
+
+    <!-- Planet Distance List (right side) -->
+    <div class="absolute flex items-center pointer-events-none" style="right:48px;top:120px;bottom:180px;">
+      <div class="flex flex-col gap-1.5 w-44">
+        <div id="planet-distance-list" class="flex flex-col gap-1.5"></div>
+      </div>
+    </div>
+
+    <!-- Bottom Stack (centered, stacked vertically with proper spacing) -->
+    <div class="absolute bottom-0 left-0 w-full flex flex-col items-center pointer-events-none"
+      style="padding-bottom:40px;gap:16px;">
+      <!-- Proximity Warning -->
+      <div id="proximity-warning"
+        class="font-[JetBrains_Mono] text-[#FFB4A4] text-xs uppercase tracking-[0.2em] opacity-0 transition-opacity duration-300">
+        ⚠ Proximity Boundary Reached
+      </div>
+
+      <!-- Locked Target Display -->
+      <div id="locked-target" class="opacity-0 transition-opacity duration-300 pointer-events-auto"
+        style="display:none;">
+        <div class="relative px-5 py-2.5 bg-[#1b1c1e]/50 backdrop-blur-md flex items-center gap-3">
+          <div class="absolute -top-px -left-px w-2.5 h-2.5 border-t border-l border-[#8ECAE6]/30"></div>
+          <div class="absolute -top-px -right-px w-2.5 h-2.5 border-t border-r border-[#8ECAE6]/30"></div>
+          <div class="absolute -bottom-px -left-px w-2.5 h-2.5 border-b border-l border-[#8ECAE6]/30"></div>
+          <div class="absolute -bottom-px -right-px w-2.5 h-2.5 border-b border-r border-[#8ECAE6]/30"></div>
+          <div class="font-[JetBrains_Mono] text-[8px] text-[#8ECAE6]/40 uppercase tracking-[0.15em]">Target</div>
+          <div id="locked-target-icon" class="w-3.5 h-3.5 border flex items-center justify-center"
+            style="border-color:#8ECAE6;padding:1px;">
+            <div class="w-full h-full" style="background:#8ECAE6;"></div>
+          </div>
+          <span id="locked-target-name"
+            class="font-[Space_Grotesk] text-sm font-semibold text-[#B0E5FF] uppercase tracking-[0.1em]">—</span>
+          <span id="locked-target-distance" class="font-[JetBrains_Mono] text-[10px] text-[#B0E5FF]/50">—</span>
+          <button id="clear-target-btn"
+            class="font-[JetBrains_Mono] text-[9px] text-[#8ECAE6]/40 hover:text-[#FFB4A4] uppercase tracking-[0.1em] ml-2 cursor-pointer transition-colors">✕
+            Clear</button>
+        </div>
+      </div>
+
+      <!-- Bottom Bar -->
+      <div class="flex items-center gap-10 pointer-events-auto">
+        <button id="btn-warp-menu"
+          class="flex flex-col items-center text-[#8ECAE6]/50 hover:text-[#B0E5FF] transition-colors cursor-pointer">
+          <span class="material-symbols-outlined text-xl mb-0.5">auto_awesome</span>
+          <span class="font-[JetBrains_Mono] text-[9px] uppercase tracking-tight">Warp [Tab]</span>
+        </button>
+        <button id="btn-controls"
+          class="flex flex-col items-center text-[#8ECAE6]/50 hover:text-[#B0E5FF] transition-colors cursor-pointer">
+          <span class="material-symbols-outlined text-xl mb-0.5">help_outline</span>
+          <span class="font-[JetBrains_Mono] text-[9px] uppercase tracking-tight">Controls [?]</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warp Menu Panel -->
+  <div id="warp-menu" class="fixed inset-0 z-20" style="display:none;">
+    <div class="absolute inset-0 bg-[#121315]/60 backdrop-blur-sm" id="warp-backdrop"></div>
+    <section
+      class="relative w-[420px] h-full bg-[#1b1c1e]/70 backdrop-blur-2xl border-r border-[#40484c]/15 flex flex-col z-10">
+      <div class="px-8 pt-20 pb-8">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-2 h-2 bg-[#B0E5FF] animate-pulse"></span>
+          <span class="font-[JetBrains_Mono] text-[10px] text-[#B0E5FF] tracking-[0.2em] uppercase">Ready for
+            transition</span>
+        </div>
+        <h2 class="font-[Space_Grotesk] text-3xl font-light text-[#e3e2e5] tracking-tight">Warp Menu: <span
+            class="font-bold text-[#B0E5FF]">Destinations</span></h2>
+        <div class="h-px w-full bg-[#40484c]/20 mt-6"></div>
+      </div>
+      <div id="warp-planet-list" class="flex-grow overflow-y-auto px-6 space-y-1"></div>
+      <div class="p-8 mt-auto border-t border-[#40484c]/10">
+        <div class="font-[JetBrains_Mono] text-[9px] text-[#8ECAE6]/40 uppercase tracking-[0.15em] text-center">Solar
+          System Orbital Telemetry</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Controls Overlay -->
+  <div id="controls-overlay"
+    class="fixed inset-0 z-30 bg-[#121315]/80 backdrop-blur-sm flex items-center justify-center p-6"
+    style="display:none;">
+    <div class="max-w-2xl w-full relative">
+      <!-- Aperture brackets -->
+      <div class="absolute -top-0.5 -left-0.5 w-3 h-3 border-t border-l border-[#8ECAE6]/30"></div>
+      <div class="absolute -top-0.5 -right-0.5 w-3 h-3 border-t border-r border-[#8ECAE6]/30"></div>
+      <div class="absolute -bottom-0.5 -left-0.5 w-3 h-3 border-b border-l border-[#8ECAE6]/30"></div>
+      <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 border-b border-r border-[#8ECAE6]/30"></div>
+      <div class="bg-[#1b1c1e]/60 backdrop-blur-xl border border-[#40484c]/15 p-10 relative overflow-hidden">
+        <div class="absolute -right-20 -top-20 w-64 h-64 border border-[#B0E5FF]/5 rounded-full pointer-events-none">
+        </div>
+        <div class="flex items-center justify-between mb-10 border-b border-[#40484c]/20 pb-6">
+          <div>
+            <h2 class="font-[Space_Grotesk] text-2xl font-bold text-[#B0E5FF] tracking-[0.15em] uppercase mb-1">System
+              Controls</h2>
+            <p class="font-[JetBrains_Mono] text-xs text-[#c0c8cd]/60 tracking-wider">PRIMARY INTERFACE CALIBRATION
+              GUIDE</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 mb-10">
+          <div class="flex items-start gap-4">
+            <div class="flex flex-col gap-1">
+              <div class="flex justify-center"><span
+                  class="w-8 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">W</span>
+              </div>
+              <div class="flex gap-1">
+                <span
+                  class="w-8 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">A</span>
+                <span
+                  class="w-8 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">S</span>
+                <span
+                  class="w-8 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">D</span>
+              </div>
+            </div>
+            <div class="pt-2">
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">
+                Navigation</h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Move craft and modulate acceleration thrusters.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div class="w-16 h-12 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5">
+              <span class="material-symbols-outlined text-[#B0E5FF] text-xl">mouse</span>
+            </div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">Look /
+                Aim</h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Directional control of optics and viewport.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div class="flex items-center gap-1">
+              <span
+                class="w-10 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">1</span>
+              <span class="text-[#B0E5FF]/20 text-xs">-</span>
+              <span
+                class="w-10 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">0</span>
+            </div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">Set Speed
+              </h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">1x–10x c. Hold Shift: 10x–50x c. Auto-decelerates near
+                planets.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div class="flex flex-col items-center gap-1">
+              <span
+                class="w-10 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">↑</span>
+              <span
+                class="w-10 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">↓</span>
+            </div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">Throttle
+              </h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Increment / decrement speed. Max 50x c in open space.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div
+              class="w-16 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-xs text-[#B0E5FF]">
+              TAB</div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">Warp Menu
+              </h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Open the stellar body destination interface.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div class="w-16 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5">
+              <span class="material-symbols-outlined text-[#B0E5FF] text-lg">near_me</span>
+            </div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">Warp
+                Action</h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Click directional arrows to engage warp to planet.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div class="w-16 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5">
+              <span class="material-symbols-outlined text-[#B0E5FF] text-lg">ads_click</span>
+            </div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">Set
+                Target</h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Right-click a planet to lock it. Speed auto-decelerates
+                near target.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div
+              class="w-16 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">
+              M</div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">System
+                Map</h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Top-down orbital telemetry map of the solar system.</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div
+              class="w-16 h-8 flex items-center justify-center border border-[#B0E5FF]/40 bg-[#B0E5FF]/5 font-[JetBrains_Mono] text-sm text-[#B0E5FF]">
+              ?</div>
+            <div>
+              <h3 class="font-[JetBrains_Mono] text-xs font-bold text-[#e3e2e5] uppercase tracking-wider mb-1">Toggle
+                HUD</h3>
+              <p class="font-[Inter] text-xs text-[#c0c8cd]">Show or hide this control reference guide.</p>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center justify-center pt-6 border-t border-[#40484c]/10">
+          <div class="flex items-center gap-3 text-[#B0E5FF]/60">
+            <span class="font-[JetBrains_Mono] text-[10px] animate-pulse">SYSTEM WAITING FOR INPUT...</span>
+            <p class="font-[JetBrains_Mono] text-xs uppercase tracking-[0.3em]">Press any key to dismiss</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="fixed inset-0 z-40 bg-[#121315] flex flex-col items-center justify-center">
+    <div class="absolute inset-0 overflow-hidden">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(142,202,230,0.03)_0%,transparent_70%)]">
+      </div>
+    </div>
+    <div class="relative z-10 flex flex-col items-center text-center px-6">
+      <!-- Aperture bracket frame -->
+      <div class="relative p-12">
+        <div class="absolute -top-0.5 -left-0.5 w-4 h-4 border-t border-l border-[#8ECAE6]/30"></div>
+        <div class="absolute -top-0.5 -right-0.5 w-4 h-4 border-t border-r border-[#8ECAE6]/30"></div>
+        <div class="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b border-l border-[#8ECAE6]/30"></div>
+        <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 border-b border-r border-[#8ECAE6]/30"></div>
+        <div class="space-y-4">
+          <div class="flex items-center justify-center gap-4 mb-2">
+            <span class="h-px w-8 bg-[#B0E5FF]/30"></span>
+            <span class="text-[12px] font-[JetBrains_Mono] text-[#93cfeb] tracking-[0.5em] uppercase">Deep Space
+              Expedition</span>
+            <span class="h-px w-8 bg-[#B0E5FF]/30"></span>
+          </div>
+          <h1
+            class="text-6xl md:text-8xl font-[Space_Grotesk] font-bold text-[#e3e2e5] tracking-tighter uppercase leading-none">
+            Solar System<br>
+            <span class="text-[#B0E5FF] font-light italic">Explorer</span>
+          </h1>
+          <p class="text-lg md:text-xl font-[Inter] text-[#c0c8cd] max-w-lg mx-auto leading-relaxed font-light">
+            A first-person journey through the cosmos. Explore the edges of our reality.
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-col items-center gap-8 w-full max-w-sm mt-8">
+        <button id="start-btn"
+          class="group relative w-full py-4 bg-[#B0E5FF] text-[#003546] font-[Space_Grotesk] font-bold uppercase tracking-[0.15em] text-lg cursor-pointer hover:bg-white transition-all shadow-[0_0_20px_rgba(176,229,255,0.2)] active:opacity-70">
+          <span class="relative z-10">Initiate Launch</span>
+          <div
+            class="absolute inset-0 border border-[#B0E5FF] translate-x-1 translate-y-1 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform">
+          </div>
+        </button>
+        <button id="how-to-play-btn"
+          class="font-[JetBrains_Mono] text-xs text-[#8ECAE6]/60 hover:text-[#B0E5FF] uppercase tracking-[0.2em] cursor-pointer transition-colors">
+          How to Play
+        </button>
+        <div class="w-full space-y-3">
+          <div
+            class="flex justify-between text-[10px] font-[JetBrains_Mono] text-[#B0E5FF]/60 uppercase tracking-[0.15em]">
+            <span>Loading Assets</span>
+            <span>Sector 07 // Sol</span>
+          </div>
+          <div class="h-0.5 w-full bg-[#292a2c] relative overflow-hidden">
+            <div id="loading-bar" class="absolute inset-y-0 left-0 bg-[#B0E5FF] transition-all duration-300"
+              style="width:0%"></div>
+          </div>
+          <div
+            class="flex justify-between text-[10px] font-[JetBrains_Mono] text-[#B0E5FF]/40 uppercase tracking-tight">
+            <span>Sys_Status: Nominal</span>
+            <span id="loading-percent">0% Compiling</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How to Play Modal -->
+  <div id="how-to-play" class="fixed inset-0 z-50 flex items-center justify-center"
+    style="display:none;background:rgba(18,19,21,0.9);">
+    <div class="relative max-w-2xl w-full mx-6">
+      <!-- Aperture brackets -->
+      <div class="absolute -top-px -left-px w-3 h-3 border-t border-l" style="border-color:rgba(142,202,230,0.3);">
+      </div>
+      <div class="absolute -top-px -right-px w-3 h-3 border-t border-r" style="border-color:rgba(142,202,230,0.3);">
+      </div>
+      <div class="absolute -bottom-px -left-px w-3 h-3 border-b border-l" style="border-color:rgba(142,202,230,0.3);">
+      </div>
+      <div class="absolute -bottom-px -right-px w-3 h-3 border-b border-r" style="border-color:rgba(142,202,230,0.3);">
+      </div>
+      <div
+        style="background:rgba(27,28,30,0.7);backdrop-filter:blur(20px);border:1px solid rgba(64,72,76,0.15);padding:48px;">
+        <h2 class="font-[Space_Grotesk] text-3xl font-bold text-[#B0E5FF] tracking-[0.15em] uppercase mb-8">How to Play
+        </h2>
+        <div class="font-[Inter] text-base text-[#c0c8cd] space-y-6" style="line-height:1.9;">
+          <p>This simulator lets you explore the solar system as it is at the current date and time. All of the planets
+            and their distances are to scale. Travel using the <span
+              class="font-[JetBrains_Mono] text-[#B0E5FF]">WASD</span> keys with the mouse.</p>
+          <p style="margin-top:8px;">To travel to a planet, right click on it and adjust your speed using the <span
+              class="font-[JetBrains_Mono] text-[#B0E5FF]">&#x2B06; up</span> and <span
+              class="font-[JetBrains_Mono] text-[#B0E5FF]">&#x2B07; down</span> arrow keys. You can travel up to 50x the
+            speed of light. As you approach your targeted planet, you'll get slowed down so you don't miss it.</p>
+          <p style="margin-top:8px;">The universe is huge, and it can take a long time to get where you want to go, even
+            at
+            multiple times the speed of light. To warp somewhere, use the <span
+              class="font-[JetBrains_Mono] text-[#B0E5FF]">Tab</span> key. To see where you are on a 2D map of the solar
+            system, press <span class="font-[JetBrains_Mono] text-[#B0E5FF]">M</span>.</p>
+          <p style="margin-top:8px;" class="text-[#B0E5FF] font-medium">Happy exploring!</p>
+        </div>
+        <div class="mt-8 flex justify-center">
+          <button id="how-to-play-close"
+            class="font-[JetBrains_Mono] text-xs text-[#8ECAE6]/60 hover:text-[#B0E5FF] uppercase tracking-[0.3em] cursor-pointer transition-colors">Press
+            any key to close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2D Solar System Map Overlay -->
+  <div id="map-overlay" class="fixed inset-0 z-25 flex items-center justify-center pointer-events-none"
+    style="display:none;">
+    <div class="relative pointer-events-auto" style="width:min(80vw,80vh);height:min(80vw,80vh);">
+      <!-- Aperture brackets -->
+      <div class="absolute -top-0.5 -left-0.5 w-3 h-3 border-t border-l border-[#8ECAE6]/30"></div>
+      <div class="absolute -top-0.5 -right-0.5 w-3 h-3 border-t border-r border-[#8ECAE6]/30"></div>
+      <div class="absolute -bottom-0.5 -left-0.5 w-3 h-3 border-b border-l border-[#8ECAE6]/30"></div>
+      <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 border-b border-r border-[#8ECAE6]/30"></div>
+      <div class="w-full h-full bg-[#0d0e10]/85 backdrop-blur-md border border-[#40484c]/15 overflow-hidden relative">
+        <div class="absolute top-4 left-5 flex items-center gap-2">
+          <span class="font-[JetBrains_Mono] text-[10px] text-[#B0E5FF] tracking-[0.2em] uppercase">Orbital Telemetry
+            Map</span>
+        </div>
+        <div class="absolute top-4 right-5">
+          <span class="font-[JetBrains_Mono] text-[10px] text-[#8ECAE6]/40 uppercase">[M] Close</span>
+        </div>
+        <canvas id="map-canvas" class="w-full h-full"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warp Transition -->
+  <div id="warp-transition"
+    class="fixed inset-0 z-50 bg-[#121315] pointer-events-none opacity-0 transition-opacity duration-300"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#121315"/>
+  <!-- Stars -->
+  <g fill="#fff" opacity="0.3">
+    <circle cx="100" cy="80" r="1"/><circle cx="250" cy="150" r="0.8"/><circle cx="400" cy="60" r="1.2"/>
+    <circle cx="550" cy="200" r="0.7"/><circle cx="700" cy="100" r="1"/><circle cx="850" cy="180" r="0.9"/>
+    <circle cx="1000" cy="50" r="1.1"/><circle cx="1100" cy="130" r="0.8"/><circle cx="150" cy="400" r="1"/>
+    <circle cx="300" cy="500" r="0.9"/><circle cx="500" cy="550" r="1.2"/><circle cx="750" cy="480" r="0.7"/>
+    <circle cx="900" cy="520" r="1"/><circle cx="1050" cy="400" r="0.8"/><circle cx="200" cy="300" r="0.6"/>
+    <circle cx="950" cy="300" r="1.1"/><circle cx="80" cy="550" r="0.9"/><circle cx="1150" cy="500" r="1"/>
+  </g>
+  <!-- Orbit rings -->
+  <circle cx="200" cy="380" r="80" fill="none" stroke="#8ECAE6" stroke-width="0.5" opacity="0.15"/>
+  <circle cx="200" cy="380" r="140" fill="none" stroke="#8ECAE6" stroke-width="0.5" opacity="0.12"/>
+  <circle cx="200" cy="380" r="220" fill="none" stroke="#8ECAE6" stroke-width="0.5" opacity="0.08"/>
+  <!-- Sun glow -->
+  <radialGradient id="sg"><stop offset="0%" stop-color="#FCB500" stop-opacity="0.4"/><stop offset="100%" stop-color="#FCB500" stop-opacity="0"/></radialGradient>
+  <circle cx="200" cy="380" r="60" fill="url(#sg)"/>
+  <circle cx="200" cy="380" r="18" fill="#FCB500"/>
+  <!-- Earth -->
+  <circle cx="280" cy="310" r="6" fill="#8ECAE6"/>
+  <!-- Mars -->
+  <circle cx="340" cy="420" r="4" fill="#B72301"/>
+  <!-- Title -->
+  <text x="520" y="280" font-family="'Space Grotesk', sans-serif" font-size="64" font-weight="700" fill="#e3e2e5" letter-spacing="-2">SOLAR SYSTEM</text>
+  <text x="520" y="360" font-family="'Space Grotesk', sans-serif" font-size="64" font-weight="300" fill="#B0E5FF" font-style="italic" letter-spacing="-2">EXPLORER</text>
+  <!-- Subtitle -->
+  <text x="520" y="410" font-family="'JetBrains Mono', monospace" font-size="14" fill="#8ECAE6" opacity="0.5" letter-spacing="4">A FIRST-PERSON JOURNEY THROUGH THE COSMOS</text>
+  <!-- Aperture brackets around title block -->
+  <line x1="505" y1="240" x2="505" y2="255" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+  <line x1="505" y1="240" x2="520" y2="240" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+  <line x1="1050" y1="240" x2="1050" y2="255" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+  <line x1="1035" y1="240" x2="1050" y2="240" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+  <line x1="505" y1="425" x2="505" y2="410" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+  <line x1="505" y1="425" x2="520" y2="425" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+  <line x1="1050" y1="425" x2="1050" y2="410" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+  <line x1="1035" y1="425" x2="1050" y2="425" stroke="#8ECAE6" stroke-width="1" opacity="0.3"/>
+</svg>
