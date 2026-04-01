@@ -18,34 +18,37 @@ const startBtn = document.getElementById('start-btn');
 const loadingBar = document.getElementById('loading-bar');
 const loadingPercent = document.getElementById('loading-percent');
 const speedDisplay = document.getElementById('speed-display');
+const speedAuDisplay = document.getElementById('speed-au-display');
 const distanceDisplay = document.getElementById('distance-display');
 const lighttimeDisplay = document.getElementById('lighttime-display');
+const etaDisplay = document.getElementById('eta-display');
 const controlsOverlay = document.getElementById('controls-overlay');
 const btnControls = document.getElementById('btn-controls');
 const btnWarpMenu = document.getElementById('btn-warp-menu');
 const warpTransition = document.getElementById('warp-transition');
 const proximityWarning = document.getElementById('proximity-warning');
-const tempDisplay = document.getElementById('temp-display');
+const tempKDisplay = document.getElementById('temp-k-display');
+const tempCDisplay = document.getElementById('temp-c-display');
 const planetDistanceList = document.getElementById('planet-distance-list');
 const targetPrompt = document.getElementById('target-prompt');
 const targetPromptName = document.getElementById('target-prompt-name');
-const lockedTargetEl = document.getElementById('locked-target');
-const lockedTargetIcon = document.getElementById('locked-target-icon');
-const lockedTargetName = document.getElementById('locked-target-name');
-const lockedTargetDistance = document.getElementById('locked-target-distance');
-const clearTargetBtn = document.getElementById('clear-target-btn');
+const hudDestIcon = document.getElementById('hud-dest-icon');
+const hudDestName = document.getElementById('hud-dest-name');
+const clearDestBtn = document.getElementById('clear-dest-btn');
 
 // ── Speed System ──
-// Requested speed: what the player has set (1x–50x c via keys).
+// Requested speed: what the player has set via throttle or keys.
 // Effective speed: min(requested, proportional limit from target distance).
 // This creates smooth automatic deceleration as you approach a planet.
-const SPEED_MIN = 1;
-const SPEED_MAX = 50;
-const SPEED_STEP = 1;
+const SPEED_STEPS = [1, 5, 10, 25, 50, 75, 100, 250, 500];
+const SPEED_MIN = SPEED_STEPS[0];
+const SPEED_MAX = SPEED_STEPS[SPEED_STEPS.length - 1];
 
 let requestedSpeed = 1;    // what the player asked for (multiples of c)
 let effectiveSpeed = 1;    // what's actually applied after distance limiting
 let currentSpeedLimit = Infinity; // speed limit from target proximity
+let currentStepIndex = 0;  // index into SPEED_STEPS
+let wasSpeedLimited = false; // track speed-limit state transitions
 
 // ── Renderer ──
 const renderer = new THREE.WebGLRenderer({
@@ -116,42 +119,139 @@ const solarMap = new SolarMap();
 // ── Speed Management ──
 function setRequestedSpeed(value) {
   requestedSpeed = Math.max(SPEED_MIN, Math.min(SPEED_MAX, Math.round(value)));
+  // Sync step index to nearest step
+  currentStepIndex = findNearestStepIndex(requestedSpeed);
+  requestedSpeed = SPEED_STEPS[currentStepIndex];
   updateSpeedDisplay();
+  updateThrottle();
+}
+
+function setSpeedByStepIndex(index) {
+  currentStepIndex = Math.max(0, Math.min(SPEED_STEPS.length - 1, index));
+  requestedSpeed = SPEED_STEPS[currentStepIndex];
+  updateSpeedDisplay();
+  updateThrottle();
 }
 
 function adjustRequestedSpeed(delta) {
-  setRequestedSpeed(requestedSpeed + delta * SPEED_STEP);
+  setSpeedByStepIndex(currentStepIndex + delta);
+}
+
+function findNearestStepIndex(value) {
+  let best = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < SPEED_STEPS.length; i++) {
+    const diff = Math.abs(SPEED_STEPS[i] - value);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  }
+  return best;
 }
 
 function updateSpeedDisplay() {
   // Effective speed = min of requested and distance-based limit
   effectiveSpeed = Math.min(requestedSpeed, currentSpeedLimit);
 
-  // Format requested speed
-  let label = `${requestedSpeed}x c`;
-
-  // Show effective speed if limited
-  if (effectiveSpeed < requestedSpeed) {
-    if (effectiveSpeed < 0.01) {
-      label += ` → ${effectiveSpeed.toFixed(3)}x`;
-    } else if (effectiveSpeed < 1) {
-      label += ` → ${effectiveSpeed.toFixed(2)}x`;
-    } else {
-      label += ` → ${Math.round(effectiveSpeed)}x`;
-    }
+  // Light speed label
+  const displaySpeed = effectiveSpeed < requestedSpeed ? effectiveSpeed : requestedSpeed;
+  let label;
+  if (displaySpeed < 0.05) {
+    const kms = Math.round(displaySpeed * 299792);
+    label = `${kms.toLocaleString()} km/s`;
+  } else if (displaySpeed < 1) {
+    label = `${displaySpeed.toFixed(2)}x c`;
+  } else {
+    label = `${Math.round(displaySpeed)}x c`;
   }
+  speedDisplay.textContent = label;
 
   // AU per second
   const auPerSec = effectiveSpeed * C_AU_PER_SEC;
   if (auPerSec < 0.001) {
-    label += ` · ${(auPerSec * 1000).toFixed(2)} mAU/s`;
+    speedAuDisplay.textContent = `${(auPerSec * 1000).toFixed(2)} mAU/s`;
   } else {
-    label += ` · ${auPerSec.toFixed(3)} AU/s`;
+    speedAuDisplay.textContent = `${auPerSec.toFixed(3)} AU/s`;
   }
 
-  speedDisplay.textContent = label;
   cameraController.speedMultiplier = effectiveSpeed;
 }
+
+// ── Throttle UI ──
+const throttleEl = document.getElementById('throttle');
+const throttleFill = document.getElementById('throttle-fill');
+const throttleHandle = document.getElementById('throttle-handle');
+const throttleLimit = document.getElementById('throttle-limit');
+const throttleNotches = document.getElementById('throttle-notches');
+const throttleZones = document.getElementById('throttle-zones');
+
+// Build notch labels and click zones (top = fastest, bottom = slowest)
+for (let i = SPEED_STEPS.length - 1; i >= 0; i--) {
+  // Notch label
+  const label = document.createElement('div');
+  label.className = 'throttle-notch';
+  label.dataset.index = i;
+  label.textContent = `${SPEED_STEPS[i]}x`;
+  throttleNotches.appendChild(label);
+
+  // Click zone
+  const zone = document.createElement('div');
+  zone.addEventListener('click', () => setSpeedByStepIndex(i));
+  throttleZones.appendChild(zone);
+}
+
+// Drag support on the throttle track
+let dragging = false;
+const throttleTrack = throttleEl.querySelector('.throttle-track');
+
+throttleTrack.addEventListener('mousedown', (e) => {
+  dragging = true;
+  handleThrottleDrag(e);
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (dragging) handleThrottleDrag(e);
+});
+
+document.addEventListener('mouseup', () => {
+  dragging = false;
+});
+
+function handleThrottleDrag(e) {
+  const rect = throttleTrack.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  const pct = 1 - Math.max(0, Math.min(1, y / rect.height));
+  const idx = Math.round(pct * (SPEED_STEPS.length - 1));
+  setSpeedByStepIndex(idx);
+}
+
+function updateThrottle() {
+  const pct = (currentStepIndex / (SPEED_STEPS.length - 1)) * 100;
+  throttleFill.style.height = `${pct}%`;
+  throttleHandle.style.bottom = `calc(${pct}% - 4px)`;
+
+  // Update notch highlights
+  const notchEls = throttleNotches.querySelectorAll('.throttle-notch');
+  notchEls.forEach(el => {
+    const idx = parseInt(el.dataset.index);
+    el.classList.toggle('active', idx === currentStepIndex);
+  });
+
+  // Speed limit indicator position
+  const isLimited = effectiveSpeed < requestedSpeed;
+  throttleEl.classList.toggle('throttle-limited', isLimited);
+
+  if (isLimited && currentSpeedLimit < SPEED_MAX) {
+    const limitIdx = findNearestStepIndex(currentSpeedLimit);
+    const limitPct = (limitIdx / (SPEED_STEPS.length - 1)) * 100;
+    throttleLimit.style.display = 'block';
+    throttleLimit.style.bottom = `${limitPct}%`;
+  } else {
+    throttleLimit.style.display = 'none';
+  }
+}
+
+// Initialize throttle state
+updateThrottle();
 
 // ── Target System ──
 // Two concepts:
@@ -211,29 +311,64 @@ function setLockedTarget(id) {
   const body = solarSystem.getBody(id);
   if (!body) return;
   lockedTarget = { id: body.id, data: body.data };
-  updateLockedTargetHUD();
+  updateDestinationHUD();
 }
 
 function clearLockedTarget() {
   lockedTarget = null;
-  lockedTargetEl.style.display = 'none';
-  lockedTargetEl.style.opacity = '0';
+  updateDestinationHUD();
 }
 
-function updateLockedTargetHUD() {
+function updateDestinationHUD() {
   if (!lockedTarget) {
-    lockedTargetEl.style.display = 'none';
-    lockedTargetEl.style.opacity = '0';
+    hudDestName.textContent = '—';
+    hudDestName.style.color = '#B0E5FF';
+    hudDestIcon.style.display = 'none';
+    clearDestBtn.style.display = 'none';
+    distanceDisplay.textContent = '—';
+    lighttimeDisplay.textContent = '—';
+    etaDisplay.textContent = '—';
     return;
   }
   const dist = getLockedTargetDist();
-  lockedTargetEl.style.display = 'block';
-  lockedTargetEl.style.opacity = '1';
-  lockedTargetName.textContent = lockedTarget.data.name;
-  lockedTargetName.style.color = lockedTarget.data.color;
-  lockedTargetIcon.style.borderColor = lockedTarget.data.color;
-  lockedTargetIcon.querySelector('div').style.background = lockedTarget.data.color;
-  lockedTargetDistance.textContent = formatDistance(dist);
+  hudDestName.textContent = lockedTarget.data.name;
+  hudDestName.style.color = lockedTarget.data.color;
+  hudDestIcon.style.display = 'flex';
+  hudDestIcon.style.borderColor = lockedTarget.data.color;
+  hudDestIcon.querySelector('div').style.background = lockedTarget.data.color;
+  clearDestBtn.style.display = 'inline';
+
+  // Distance
+  distanceDisplay.textContent = formatDistance(dist);
+
+  // Light-time
+  const lightMinutes = dist * AU_TO_LIGHT_MIN;
+  if (lightMinutes < 60) {
+    lighttimeDisplay.textContent = `${lightMinutes.toFixed(1)} lt-min`;
+  } else {
+    lighttimeDisplay.textContent = `${(lightMinutes / 60).toFixed(1)} lt-hr`;
+  }
+
+  // ETA based on current effective speed
+  const auPerSec = effectiveSpeed * C_AU_PER_SEC;
+  if (auPerSec > 0 && dist < Infinity) {
+    const etaSec = dist / auPerSec;
+    if (etaSec < 60) {
+      etaDisplay.textContent = `${Math.round(etaSec)}s`;
+    } else if (etaSec < 3600) {
+      etaDisplay.textContent = `${Math.round(etaSec / 60)}m ${Math.round(etaSec % 60)}s`;
+    } else if (etaSec < 86400) {
+      const h = Math.floor(etaSec / 3600);
+      const m = Math.round((etaSec % 3600) / 60);
+      etaDisplay.textContent = `${h}h ${m}m`;
+    } else {
+      const d = Math.floor(etaSec / 86400);
+      const h = Math.round((etaSec % 86400) / 3600);
+      etaDisplay.textContent = `${d}d ${h}h`;
+    }
+  } else {
+    etaDisplay.textContent = '—';
+  }
 }
 
 function updateCrosshairPrompt() {
@@ -256,13 +391,11 @@ document.addEventListener('mousedown', (e) => {
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // Clear target button
-clearTargetBtn.addEventListener('click', (e) => {
+clearDestBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   clearLockedTarget();
 });
 
-// Start with Earth as the initial target
-setTimeout(() => setLockedTarget('earth'), 100);
 
 // ── Warp Function ──
 function warpToPlanet(planetId) {
@@ -316,25 +449,14 @@ function warpToPlanet(planetId) {
 
 // ── Keyboard Shortcuts ──
 document.addEventListener('keydown', (e) => {
-  // Number keys: set requested speed
-  // 1-9 = 1x-9x c, 0 = 10x c
-  // Shift + number: 10x multiplier (Shift+1=10, Shift+2=20, ... Shift+5=50)
-  if (e.code >= 'Digit1' && e.code <= 'Digit9') {
-    const n = parseInt(e.code.replace('Digit', ''));
-    setRequestedSpeed(e.shiftKey ? n * 10 : n);
-  }
-  if (e.code === 'Digit0') {
-    setRequestedSpeed(10);
-  }
-
-  // Arrow up/down: increment/decrement requested speed
+  // Arrow up/down: step through throttle increments (disabled when speed-limited)
   if (e.code === 'ArrowUp') {
     e.preventDefault();
-    adjustRequestedSpeed(1);
+    if (effectiveSpeed >= requestedSpeed) adjustRequestedSpeed(1);
   }
   if (e.code === 'ArrowDown') {
     e.preventDefault();
-    adjustRequestedSpeed(-1);
+    if (effectiveSpeed >= requestedSpeed) adjustRequestedSpeed(-1);
   }
 
   // Tab = warp menu
@@ -439,9 +561,6 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ── Earth position reference for distance tracking ──
-const earthWorldPos = computePlanetPosition('earth');
-
 // ── Planet Distance List ──
 let lastDistListUpdate = 0;
 
@@ -506,12 +625,13 @@ function animate(now) {
   currentSpeedLimit = computeSpeedLimit(targetDist);
 
   // Update locked target HUD (distance changes each frame)
-  if (lockedTarget) updateLockedTargetHUD();
+  if (lockedTarget) updateDestinationHUD();
 
   // Apply effective speed (requested capped by distance limit)
   effectiveSpeed = Math.min(requestedSpeed, currentSpeedLimit);
   cameraController.speedMultiplier = effectiveSpeed;
   updateSpeedDisplay();
+  updateThrottle();
 
   // Update camera
   cameraController.update(dt);
@@ -527,27 +647,9 @@ function animate(now) {
     warpMenu.updateDistances(solarSystem.bodies, cameraController.worldPosition);
   }
 
-  // Update distance from Earth
-  const dx = cameraController.worldPosition.x - earthWorldPos.x;
-  const dy = cameraController.worldPosition.y - earthWorldPos.y;
-  const dz = cameraController.worldPosition.z - earthWorldPos.z;
-  const distFromEarth = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-  if (distFromEarth < 0.01) {
-    distanceDisplay.textContent = `${(distFromEarth * 149597870.7).toFixed(0)} km`;
-  } else {
-    distanceDisplay.textContent = `${distFromEarth.toFixed(3)} AU`;
-  }
-
-  const lightMinutes = distFromEarth * AU_TO_LIGHT_MIN;
-  if (lightMinutes < 60) {
-    lighttimeDisplay.textContent = `${lightMinutes.toFixed(1)} lt-min`;
-  } else {
-    lighttimeDisplay.textContent = `${(lightMinutes / 60).toFixed(1)} lt-hr`;
-  }
-
   // Speed limit indicator — show when actively being limited
-  if (lockedTarget && effectiveSpeed < requestedSpeed) {
+  const isSpeedLimited = lockedTarget && effectiveSpeed < requestedSpeed;
+  if (isSpeedLimited) {
     let limitLabel;
     if (effectiveSpeed < 0.01) {
       limitLabel = `${effectiveSpeed.toFixed(3)}x c`;
@@ -558,8 +660,16 @@ function animate(now) {
     }
     proximityWarning.textContent = `▶ Proximity deceleration — ${lockedTarget.data.name}. Limit: ${limitLabel}`;
     proximityWarning.style.opacity = '1';
+    etaDisplay.textContent = 'ARRIVING';
+    etaDisplay.classList.add('eta-arriving');
+    wasSpeedLimited = true;
   } else {
+    if (wasSpeedLimited) {
+      setSpeedByStepIndex(0); // reset to 1x
+      wasSpeedLimited = false;
+    }
     proximityWarning.style.opacity = '0';
+    etaDisplay.classList.remove('eta-arriving');
   }
 
   // Temperature: equilibrium temperature from solar distance
@@ -590,7 +700,8 @@ function animate(now) {
   // Deep space minimum: cosmic microwave background 2.7K
   tempK = Math.max(2.7, tempK);
   const tempC = tempK - 273.15;
-  tempDisplay.textContent = `${Math.round(tempK)} K / ${Math.round(tempC)} °C`;
+  tempKDisplay.textContent = `${Math.round(tempK)} K`;
+  tempCDisplay.textContent = `${Math.round(tempC)} °C`;
 
   // Update planet distance list (throttled to ~4Hz to avoid DOM thrash)
   if (now - lastDistListUpdate > 250) {

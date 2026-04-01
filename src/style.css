@@ -2,10 +2,12 @@
 @source "..";
 
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 }
 
 #scene {
@@ -104,6 +106,54 @@
 .warp-item.active {
   background-color: rgba(176, 229, 255, 0.1);
   border-left: 4px solid #B0E5FF;
+}
+
+/* Throttle */
+#throttle.throttle-limited .throttle-track {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+#throttle.throttle-limited #throttle-handle > div {
+  background: #6b7280;
+  border-color: #6b7280;
+}
+
+#throttle.throttle-limited #throttle-fill {
+  background: rgba(107, 114, 128, 0.15);
+}
+
+#throttle-zones > div {
+  flex: 1;
+  cursor: pointer;
+}
+
+#throttle-zones > div:hover {
+  background: rgba(176, 229, 255, 0.05);
+}
+
+.throttle-notch {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: rgba(176, 229, 255, 0.35);
+  line-height: 1;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.throttle-notch.active {
+  color: #B0E5FF;
+}
+
+/* ETA arriving flash */
+.eta-arriving {
+  animation: eta-flash 1s ease-in-out infinite;
+  color: #FFB4A4 !important;
+}
+
+@keyframes eta-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 /* Custom scrollbar for warp menu */

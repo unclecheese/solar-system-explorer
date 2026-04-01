@@ -103,17 +103,17 @@ export class CameraController {
       moveZ -= forward.z;
     }
     if (this.keys.has('KeyA')) {
-      moveX -= right.x;
-      moveZ -= right.z;
-    }
-    if (this.keys.has('KeyD')) {
       moveX += right.x;
       moveZ += right.z;
     }
-    if (this.keys.has('Space')) {
+    if (this.keys.has('KeyD')) {
+      moveX -= right.x;
+      moveZ -= right.z;
+    }
+    if (this.keys.has('KeyQ') || this.keys.has('Space')) {
       moveY += 1;
     }
-    if (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) {
+    if (this.keys.has('KeyZ') || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) {
       moveY -= 1;
     }
 
